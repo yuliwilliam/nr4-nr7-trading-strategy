@@ -1,4 +1,5 @@
 import pandas as pd
+import matplotlib.pyplot as plt
 
 
 def load_data(data_file_path):
@@ -37,8 +38,10 @@ def get_everyday_data(data):
     return data_list
 
 
-def test_result(data, buy_sell_prices, cash, pip):
+def test_result(data, buy_sell_prices, cash, stop_loss_pip, stop_profit_pip):
+    profit_loss_data = {'DATE': [], 'PROFIT LOSS PERCENTAGE': [], 'PROFIT LOSS AMOUNT': []}
     for buy_sell_price in buy_sell_prices:
+        initial_cash = cash
         position = 0
         holdings = 0
         indicator = ''
@@ -68,20 +71,33 @@ def test_result(data, buy_sell_prices, cash, pip):
             # holdings in hand
             if position != 0 or holdings != 0:
                 # check loss
-                if indicator == 'b' and curr_price <= position - position * pip:
+                if indicator == 'b' and curr_price <= position - position * stop_loss_pip:
                     cash = cash + curr_price * holdings
                     position = 0
                     holdings = 0
-                    print("    sold bought at {}".format(curr_price))
+                    print("    stop loss bought at {}".format(curr_price))
 
-                if indicator == 's' and curr_price >= position + position * pip:
+                elif indicator == 's' and curr_price >= position + position * stop_loss_pip:
                     cash = cash - curr_price * holdings
                     position = 0
                     holdings = 0
-                    print("    sold shorted at {}".format(curr_price))
+                    print("    stop loss shorted at {}".format(curr_price))
+
+                # check profit
+                elif indicator == 'b' and curr_price >= position + position * stop_profit_pip:
+                    cash = cash + curr_price * holdings
+                    position = 0
+                    holdings = 0
+                    print("    stop profit bought at {}".format(curr_price))
+
+                elif indicator == 's' and curr_price <= position - position * stop_profit_pip:
+                    cash = cash - curr_price * holdings
+                    position = 0
+                    holdings = 0
+                    print("    stop profit shorted at {}".format(curr_price))
 
                 # clean up, if last day
-                if index == curr_day_data.shape[0] - 1:
+                elif index == curr_day_data.shape[0] - 1:
                     if indicator == 'b':
                         cash = cash + curr_price * holdings
                         position = 0
@@ -93,15 +109,33 @@ def test_result(data, buy_sell_prices, cash, pip):
                         holdings = 0
                         print("    cleaned shorted at {}".format(curr_price))
             index += 1
+        profit_loss = cash - initial_cash
+        profit_loss_percentage = profit_loss / initial_cash
+        profit_loss_data['DATE'].append(str(curr_date))
+        profit_loss_data['PROFIT LOSS PERCENTAGE'].append(profit_loss_percentage)
+        profit_loss_data['PROFIT LOSS AMOUNT'].append(profit_loss)
+        print("    cash on open: {}, cash on close: {}".format(initial_cash, cash))
+        print("    profit/loss amount: {}, profit/loss rate: {}".format(profit_loss, profit_loss_percentage))
 
+    df = pd.DataFrame(profit_loss_data, columns=['DATE', 'PROFIT LOSS PERCENTAGE', 'PROFIT LOSS AMOUNT'])
+    print('overview:')
+    print(df)
+    ax = plt.gca()
+    df.plot(kind='line', x='DATE', y='PROFIT LOSS PERCENTAGE', ax=ax)
+    df.plot(kind='line', x='DATE', y='PROFIT LOSS AMOUNT', color='red', ax=ax)
+    df.plot(kind='line', x='DATE', y='PROFIT LOSS PERCENTAGE')
+    df.plot(kind='line', x='DATE', y='PROFIT LOSS AMOUNT')
+
+    plt.show()
     return cash
 
 
 if __name__ == '__main__':
-    data_file_path = "./data/USD/USDCAD-1M-2004.1.1-2020.3.31.csv"
+    data_file_path = "./data/USD/USDMXN-1M-2008.1.1-2020.5.22.csv"
     cash = 10000
-    pip = 0.01
+    pip = 0.0001
     stop_loss_pip = 10 * pip
+    stop_profit_pip = 40 * pip
     data = load_data(data_file_path)
     everyday_data = get_everyday_data(data)
     buy_sell_prices = []
@@ -126,5 +160,5 @@ if __name__ == '__main__':
                                                                                  everyday_data[i]['LOW'],
                                                                                  fourth_price_range))
     print("started testing with {} cash".format(cash))
-    cash = test_result(data, buy_sell_prices, cash, stop_loss_pip)
+    cash = test_result(data, buy_sell_prices, cash, stop_loss_pip, stop_profit_pip)
     print("ended testing with {} cash".format(cash))
