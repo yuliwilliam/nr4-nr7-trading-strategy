@@ -125,6 +125,8 @@ def test_result(data, buy_sell_prices, cash, stop_loss_pip, stop_profit_pip):
     df.plot(kind='line', x='DATE', y='PROFIT LOSS AMOUNT', color='red', ax=ax)
     df.plot(kind='line', x='DATE', y='PROFIT LOSS PERCENTAGE')
     df.plot(kind='line', x='DATE', y='PROFIT LOSS AMOUNT')
+    df.plot(kind='bar', x='DATE', y='PROFIT LOSS PERCENTAGE')
+    df.plot(kind='bar', x='DATE', y='PROFIT LOSS AMOUNT')
 
     plt.show()
     return cash
