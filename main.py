@@ -118,16 +118,29 @@ def test_result(data, buy_sell_prices, cash, stop_loss_pip, stop_profit_pip):
         print("    profit/loss amount: {}, profit/loss rate: {}".format(profit_loss, profit_loss_percentage))
 
     df = pd.DataFrame(profit_loss_data, columns=['DATE', 'PROFIT LOSS PERCENTAGE', 'PROFIT LOSS AMOUNT'])
-    print('overview:')
+    print("trading overview:")
     print(df)
     ax = plt.gca()
     df.plot(kind='line', x='DATE', y='PROFIT LOSS PERCENTAGE', ax=ax)
     df.plot(kind='line', x='DATE', y='PROFIT LOSS AMOUNT', color='red', ax=ax)
-    df.plot(kind='line', x='DATE', y='PROFIT LOSS PERCENTAGE')
-    df.plot(kind='line', x='DATE', y='PROFIT LOSS AMOUNT')
-    df.plot(kind='bar', x='DATE', y='PROFIT LOSS PERCENTAGE')
-    df.plot(kind='bar', x='DATE', y='PROFIT LOSS AMOUNT')
+    plt.suptitle("PROFIT LOSS PERCENTAGE AND AMOUNT vs DATE LINE GRAPH")
+    plt.savefig("./graph/PROFIT LOSS PERCENTAGE AND AMOUNT vs DATE LINE GRAPH.png")
 
+    df.plot(kind='line', x='DATE', y='PROFIT LOSS PERCENTAGE')
+    plt.suptitle("PROFIT LOSS PERCENTAGE vs DATE LINE GRAPH")
+    plt.savefig("./graph/PROFIT LOSS PERCENTAGE vs DATE LINE GRAPH.png")
+
+    df.plot(kind='line', x='DATE', y='PROFIT LOSS AMOUNT')
+    plt.suptitle("PROFIT LOSS AMOUNT vs DATE LINE GRAPH")
+    plt.savefig("./graph/PROFIT LOSS AMOUNT vs DATE LINE GRAPH.png")
+
+    df.plot(kind='bar', x='DATE', y='PROFIT LOSS PERCENTAGE')
+    plt.suptitle("PROFIT LOSS PERCENTAGE vs DATE BAR GRAPH")
+    plt.savefig("./graph/PROFIT LOSS PERCENTAGE vs DATE BAR GRAPH.png")
+
+    df.plot(kind='bar', x='DATE', y='PROFIT LOSS AMOUNT')
+    plt.suptitle("PROFIT LOSS AMOUNT vs DATE BAR GRAPH")
+    plt.savefig("./graph/PROFIT LOSS AMOUNT vs DATE BAR GRAPH.png")
     plt.show()
     return cash
 
