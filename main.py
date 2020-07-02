@@ -1,8 +1,8 @@
 import pandas as pd
 
 
-def load_data():
-    data = pd.read_csv("./data/USD/USDCAD-1M-2004.1.1-2020.3.31.csv",
+def load_data(data_file_path):
+    data = pd.read_csv(data_file_path,
                        usecols=['<TICKER>', '<DTYYYYMMDD>', '<TIME>', '<OPEN>', '<HIGH>', '<LOW>', '<CLOSE>', '<VOL>'])
     return data
 
@@ -11,7 +11,7 @@ def get_everyday_data(data):
     data_list = []
     # data_size = data.shape[0]
     # smaller data size for testing purpose
-    data_size = int(data.shape[0] * 0.2)
+    data_size = int(data.shape[0] * 0.01)
     for i in range(data_size):
         curr_day_ticker = data['<TICKER>'][i]
         curr_day_date = data['<DTYYYYMMDD>'][i]
@@ -98,10 +98,11 @@ def test_result(data, buy_sell_prices, cash, pip):
 
 
 if __name__ == '__main__':
+    data_file_path = "./data/USD/USDCAD-1M-2004.1.1-2020.3.31.csv"
     cash = 10000
     pip = 0.01
     stop_loss_pip = 10 * pip
-    data = load_data()
+    data = load_data(data_file_path)
     everyday_data = get_everyday_data(data)
     buy_sell_prices = []
 
