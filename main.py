@@ -12,7 +12,7 @@ def get_everyday_data(data):
     data_list = []
     # data_size = data.shape[0]
     # smaller data size for testing purpose
-    data_size = int(data.shape[0] * 0.1)
+    data_size = int(data.shape[0] * 0.01)
     for i in range(data_size):
         curr_day_ticker = data['<TICKER>'][i]
         curr_day_date = data['<DTYYYYMMDD>'][i]
@@ -49,7 +49,7 @@ def get_nr4_days(everyday_data, pip):
         if min(first_price_range, second_price_range, third_price_range, fourth_price_range) == fourth_price_range \
                 and everyday_data[i]['LOW'] >= everyday_data[i - 1]['LOW'] \
                 and everyday_data[i]['HIGH'] <= everyday_data[i - 1]['HIGH']:
-            transaction_date = everyday_data[i + 1]['DATE']
+            transaction_date = [everyday_data[i + 1]['DATE']]
             buy_price = everyday_data[i]['HIGH'] + everyday_data[i]['HIGH'] * pip
             short_price = everyday_data[i]['LOW'] - everyday_data[i]['LOW'] * pip
 
@@ -59,6 +59,36 @@ def get_nr4_days(everyday_data, pip):
                                                                                  everyday_data[i]['HIGH'],
                                                                                  everyday_data[i]['LOW'],
                                                                                  fourth_price_range))
+    return buy_sell_prices
+
+
+def get_nr7_days(everyday_data, pip):
+    buy_sell_prices = []
+    # exclude last day
+    for i in range(7, len(everyday_data) - 3):
+
+        first_price_range = everyday_data[i - 6]['HIGH'] - everyday_data[i - 6]['LOW']
+        second_price_range = everyday_data[i - 5]['HIGH'] - everyday_data[i - 5]['LOW']
+        third_price_range = everyday_data[i - 4]['HIGH'] - everyday_data[i - 4]['LOW']
+        fourth_price_range = everyday_data[i - 3]['HIGH'] - everyday_data[i - 3]['LOW']
+        fifth_price_range = everyday_data[i - 2]['HIGH'] - everyday_data[i - 2]['LOW']
+        sixth_price_range = everyday_data[i - 1]['HIGH'] - everyday_data[i - 1]['LOW']
+        seventh_price_range = everyday_data[i]['HIGH'] - everyday_data[i]['LOW']
+        if min(first_price_range, second_price_range, third_price_range, fourth_price_range, fifth_price_range,
+               sixth_price_range, seventh_price_range) == seventh_price_range \
+                and everyday_data[i]['LOW'] >= everyday_data[i - 1]['LOW'] \
+                and everyday_data[i]['HIGH'] <= everyday_data[i - 1]['HIGH']:
+            transaction_date = [everyday_data[i + 1]['DATE'], everyday_data[i + 2]['DATE'],
+                                everyday_data[i + 3]['DATE']]
+            buy_price = everyday_data[i]['HIGH'] + everyday_data[i]['HIGH'] * pip
+            short_price = everyday_data[i]['LOW'] - everyday_data[i]['LOW'] * pip
+
+            buy_sell_price = {'DATE': transaction_date, 'BUY': buy_price, 'SHORT': short_price}
+            buy_sell_prices.append(buy_sell_price)
+            print("NR4 day, data: {}, high: {}, low: {}, price range: {}".format(everyday_data[i]['DATE'],
+                                                                                 everyday_data[i]['HIGH'],
+                                                                                 everyday_data[i]['LOW'],
+                                                                                 seventh_price_range))
     return buy_sell_prices
 
 
@@ -73,68 +103,72 @@ def test_result(data, buy_sell_prices, cash, stop_loss_pip, stop_profit_pip):
         indicator = ''
         buy_price = buy_sell_price['BUY']
         short_price = buy_sell_price['SHORT']
-        curr_date = buy_sell_price['DATE']
-        curr_day_data = data.loc[data['<DTYYYYMMDD>'] == curr_date]
-        index = 0
-        print("date: {}".format(curr_date))
-        for i, curr_entry in curr_day_data.iterrows():
-            curr_price = curr_entry['<OPEN>']
+        print("dates: {}".format(buy_sell_price['DATE']))
+        for j, curr_date in enumerate(buy_sell_price['DATE']):
+            curr_day_data = data.loc[data['<DTYYYYMMDD>'] == curr_date]
+            index = 0
+            print("    date: {}".format(curr_date))
 
-            # buy sell
-            if indicator == '' and curr_price >= buy_price:
-                position = curr_price
-                holdings = int(cash / curr_price)
-                cash = cash - curr_price * holdings
-                indicator = 'b'
-                print("    bought at {}".format(curr_price))
-            if indicator == '' and curr_price <= short_price:
-                position = curr_price
-                holdings = int(cash / curr_price)
-                cash = cash + curr_price * holdings
-                indicator = 's'
-                print("    shorted at {}".format(curr_price))
+            for i, curr_entry in curr_day_data.iterrows():
+                curr_price = curr_entry['<OPEN>']
 
-            # holdings in hand
-            if position != 0 or holdings != 0:
-                # check loss
-                if indicator == 'b' and curr_price <= position - position * stop_loss_pip:
-                    cash = cash + curr_price * holdings
-                    position = 0
-                    holdings = 0
-                    print("    stop loss bought at {}".format(curr_price))
-
-                elif indicator == 's' and curr_price >= position + position * stop_loss_pip:
+                # buy sell
+                if indicator == '' and curr_price >= buy_price:
+                    position = curr_price
+                    holdings = int(cash / curr_price)
                     cash = cash - curr_price * holdings
-                    position = 0
-                    holdings = 0
-                    print("    stop loss shorted at {}".format(curr_price))
-
-                # check profit
-                elif indicator == 'b' and curr_price >= position + position * stop_profit_pip:
+                    indicator = 'b'
+                    print("        bought at {}".format(curr_price))
+                if indicator == '' and curr_price <= short_price:
+                    position = curr_price
+                    holdings = int(cash / curr_price)
                     cash = cash + curr_price * holdings
-                    position = 0
-                    holdings = 0
-                    print("    stop profit bought at {}".format(curr_price))
+                    indicator = 's'
+                    print("        shorted at {}".format(curr_price))
 
-                elif indicator == 's' and curr_price <= position - position * stop_profit_pip:
-                    cash = cash - curr_price * holdings
-                    position = 0
-                    holdings = 0
-                    print("    stop profit shorted at {}".format(curr_price))
-
-                # clean up, if last day
-                elif index == curr_day_data.shape[0] - 1:
-                    if indicator == 'b':
+                # holdings in hand
+                if position != 0 or holdings != 0:
+                    # check loss
+                    if indicator == 'b' and curr_price <= position - position * stop_loss_pip:
                         cash = cash + curr_price * holdings
                         position = 0
                         holdings = 0
-                        print("    cleaned bought at {}".format(curr_price))
-                    if indicator == 's':
+                        print("        stop loss bought at {}".format(curr_price))
+
+                    elif indicator == 's' and curr_price >= position + position * stop_loss_pip:
                         cash = cash - curr_price * holdings
                         position = 0
                         holdings = 0
-                        print("    cleaned shorted at {}".format(curr_price))
-            index += 1
+                        print("        stop loss shorted at {}".format(curr_price))
+
+                    # check profit
+                    elif indicator == 'b' and curr_price >= position + position * stop_profit_pip:
+                        cash = cash + curr_price * holdings
+                        position = 0
+                        holdings = 0
+                        print("        stop profit bought at {}".format(curr_price))
+
+                    elif indicator == 's' and curr_price <= position - position * stop_profit_pip:
+                        cash = cash - curr_price * holdings
+                        position = 0
+                        holdings = 0
+                        print("        stop profit shorted at {}".format(curr_price))
+
+                    # clean up, if last day
+                    elif index == curr_day_data.shape[0] - 1 and j == (len(buy_sell_price['DATE']) - 1):
+                        if indicator == 'b':
+                            cash = cash + curr_price * holdings
+                            position = 0
+                            holdings = 0
+                            print("        cleaned bought at {}".format(curr_price))
+                        if indicator == 's':
+                            cash = cash - curr_price * holdings
+                            position = 0
+                            holdings = 0
+                            print("        cleaned shorted at {}".format(curr_price))
+                index += 1
+
+
         profit_loss = cash - initial_cash
         profit_loss_percentage = profit_loss / initial_cash
         profit_loss_data['DATE'].append(str(curr_date))
@@ -184,5 +218,5 @@ if __name__ == '__main__':
 
     data = load_data(data_file_path)
     everyday_data = get_everyday_data(data)
-    buy_sell_prices = get_nr4_days(everyday_data, pip)
+    buy_sell_prices = get_nr7_days(everyday_data, pip)
     cash = test_result(data, buy_sell_prices, cash, stop_loss_pip, stop_profit_pip)
