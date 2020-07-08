@@ -85,7 +85,7 @@ def get_nr7_days(everyday_data, pip):
 
             buy_sell_price = {'DATE': transaction_date, 'BUY': buy_price, 'SHORT': short_price}
             buy_sell_prices.append(buy_sell_price)
-            print("NR4 day, data: {}, high: {}, low: {}, price range: {}".format(everyday_data[i]['DATE'],
+            print("NR7 day, data: {}, high: {}, low: {}, price range: {}".format(everyday_data[i]['DATE'],
                                                                                  everyday_data[i]['HIGH'],
                                                                                  everyday_data[i]['LOW'],
                                                                                  seventh_price_range))
