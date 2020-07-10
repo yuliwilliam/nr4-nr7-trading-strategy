@@ -184,9 +184,12 @@ def test_result(data, buy_sell_prices, cash, stop_loss_pip, stop_profit_pip):
             profit_loss_data_by_month['PROFIT LOSS PERCENTAGE'].append(profit_loss_percentage)
             profit_loss_data_by_month['PROFIT LOSS AMOUNT'].append(profit_loss)
         else:
-            profit_loss_data_by_month['PROFIT LOSS PERCENTAGE'][-1] \
-                += (profit_loss / profit_loss_data_by_month['PROFIT LOSS AMOUNT'][-1]) \
-                   * profit_loss_data_by_month['PROFIT LOSS PERCENTAGE'][-1]
+            if profit_loss_data_by_month['PROFIT LOSS AMOUNT'][-1] == 0:
+                profit_loss_data_by_month['PROFIT LOSS PERCENTAGE'][-1] += profit_loss_percentage
+            else:
+                profit_loss_data_by_month['PROFIT LOSS PERCENTAGE'][-1] \
+                    += (profit_loss / profit_loss_data_by_month['PROFIT LOSS AMOUNT'][-1]) \
+                       * profit_loss_data_by_month['PROFIT LOSS PERCENTAGE'][-1]
             profit_loss_data_by_month['PROFIT LOSS AMOUNT'][-1] += profit_loss
 
         print("    cash on open: {}, cash on close: {}".format(initial_cash, cash))
