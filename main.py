@@ -98,7 +98,7 @@ def test_result(data, buy_sell_prices, cash, stop_loss_pip, stop_profit_pip):
             print("    date: {}".format(curr_date))
 
             for i in range(curr_day_data.shape[0]):
-                curr_price = curr_day_data['<OPEN>'].iloc[i]
+                curr_price = curr_day_data['<CLOSE>'].iloc[i]
 
                 # buy sell
                 if indicator == '' and curr_price >= buy_price:
