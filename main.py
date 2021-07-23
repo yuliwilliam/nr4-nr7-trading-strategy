@@ -1,6 +1,7 @@
+import time
 import pandas as pd
 import matplotlib.pyplot as plt
-import threading
+import multiprocessing
 from pathlib import Path
 
 
@@ -14,26 +15,20 @@ def get_everyday_data(data):
     data_list = []
     data_size = data.shape[0]
     # smaller data size for testing purpose
-    # data_size = int(data.shape[0] * 0.01)
+    # data_size = int(data.shape[0] * 0.05)
     for i in range(data_size):
         curr_day_date = data['<DTYYYYMMDD>'][i]
         curr_day_high = data['<HIGH>'][i]
         curr_day_low = data['<LOW>'][i]
-        if len(data_list) != 0 and data_list[-1]['DATE'] == curr_day_date:
-            continue
-        for j in range(i, data_size):
-            curr_entry_date = data['<DTYYYYMMDD>'][j]
-            curr_entry_high = data['<HIGH>'][j]
-            curr_entry_low = data['<LOW>'][j]
-            if curr_entry_date != curr_day_date:
-                break
-            if curr_entry_high > curr_day_high:
-                curr_day_high = curr_entry_high
-            if curr_entry_low < curr_day_low:
-                curr_day_low = curr_entry_low
-        curr_day = {'DATE': curr_day_date, 'HIGH': curr_day_high, 'LOW': curr_day_low}
-        data_list.append(curr_day)
-        print("processed date: {}, high: {}, low: {}".format(curr_day_date, curr_day_high, curr_day_low))
+        if len(data_list) > 0 and curr_day_date == data_list[-1]['DATE']:
+            data_list[-1]['HIGH'] = max(data_list[-1]['HIGH'], curr_day_high)
+            data_list[-1]['LOW'] = min(data_list[-1]['LOW'], curr_day_low)
+            data_list[-1]['RANGE'] = data_list[-1]['HIGH'] - data_list[-1]['LOW']
+        else:
+            curr_day = {'DATE': curr_day_date, 'HIGH': curr_day_high, 'LOW': curr_day_low,
+                        'RANGE': curr_day_high - curr_day_low}
+            data_list.append(curr_day)
+            print("processed date: {}, high: {}, low: {}".format(curr_day_date, curr_day_high, curr_day_low))
 
     return data_list
 
@@ -42,11 +37,8 @@ def get_nr4_days(everyday_data, pip):
     buy_sell_prices = []
     # exclude last day
     for i in range(3, len(everyday_data) - 3):
-        first_price_range = everyday_data[i - 3]['HIGH'] - everyday_data[i - 3]['LOW']
-        second_price_range = everyday_data[i - 2]['HIGH'] - everyday_data[i - 2]['LOW']
-        third_price_range = everyday_data[i - 1]['HIGH'] - everyday_data[i - 1]['LOW']
-        fourth_price_range = everyday_data[i]['HIGH'] - everyday_data[i]['LOW']
-        if min(first_price_range, second_price_range, third_price_range, fourth_price_range) == fourth_price_range \
+        if min(everyday_data[i - 3]['RANGE'], everyday_data[i - 2]['RANGE'], everyday_data[i - 1]['RANGE'],
+               everyday_data[i]['RANGE']) == everyday_data[i]['RANGE'] \
                 and everyday_data[i]['LOW'] >= everyday_data[i - 1]['LOW'] \
                 and everyday_data[i]['HIGH'] <= everyday_data[i - 1]['HIGH']:
             transaction_date = [everyday_data[i + 1]['DATE'], everyday_data[i + 2]['DATE'],
@@ -59,7 +51,7 @@ def get_nr4_days(everyday_data, pip):
             print("NR4 day, data: {}, high: {}, low: {}, price range: {}".format(everyday_data[i]['DATE'],
                                                                                  everyday_data[i]['HIGH'],
                                                                                  everyday_data[i]['LOW'],
-                                                                                 fourth_price_range))
+                                                                                 everyday_data[i]['RANGE']))
     return buy_sell_prices
 
 
@@ -67,16 +59,9 @@ def get_nr7_days(everyday_data, pip):
     buy_sell_prices = []
     # exclude last day
     for i in range(7, len(everyday_data) - 3):
-
-        first_price_range = everyday_data[i - 6]['HIGH'] - everyday_data[i - 6]['LOW']
-        second_price_range = everyday_data[i - 5]['HIGH'] - everyday_data[i - 5]['LOW']
-        third_price_range = everyday_data[i - 4]['HIGH'] - everyday_data[i - 4]['LOW']
-        fourth_price_range = everyday_data[i - 3]['HIGH'] - everyday_data[i - 3]['LOW']
-        fifth_price_range = everyday_data[i - 2]['HIGH'] - everyday_data[i - 2]['LOW']
-        sixth_price_range = everyday_data[i - 1]['HIGH'] - everyday_data[i - 1]['LOW']
-        seventh_price_range = everyday_data[i]['HIGH'] - everyday_data[i]['LOW']
-        if min(first_price_range, second_price_range, third_price_range, fourth_price_range, fifth_price_range,
-               sixth_price_range, seventh_price_range) == seventh_price_range \
+        if min(everyday_data[i - 6]['RANGE'], everyday_data[i - 5]['RANGE'], everyday_data[i - 4]['RANGE'],
+               everyday_data[i - 3]['RANGE'], everyday_data[i - 2]['RANGE'],
+               everyday_data[i - 1]['RANGE'], everyday_data[i]['RANGE']) == everyday_data[i]['RANGE'] \
                 and everyday_data[i]['LOW'] >= everyday_data[i - 1]['LOW'] \
                 and everyday_data[i]['HIGH'] <= everyday_data[i - 1]['HIGH']:
             transaction_date = [everyday_data[i + 1]['DATE'], everyday_data[i + 2]['DATE'],
@@ -89,7 +74,7 @@ def get_nr7_days(everyday_data, pip):
             print("NR7 day, data: {}, high: {}, low: {}, price range: {}".format(everyday_data[i]['DATE'],
                                                                                  everyday_data[i]['HIGH'],
                                                                                  everyday_data[i]['LOW'],
-                                                                                 seventh_price_range))
+                                                                                 everyday_data[i]['RANGE']))
     return buy_sell_prices
 
 
@@ -112,8 +97,8 @@ def test_result(data, buy_sell_prices, cash, stop_loss_pip, stop_profit_pip):
             entry_number = 0
             print("    date: {}".format(curr_date))
 
-            for i, curr_entry in curr_day_data.iterrows():
-                curr_price = curr_entry['<OPEN>']
+            for i in range(curr_day_data.shape[0]):
+                curr_price = curr_day_data['<OPEN>'].iloc[i]
 
                 # buy sell
                 if indicator == '' and curr_price >= buy_price:
@@ -238,10 +223,12 @@ def save_test_result(profit_loss_df_by_day, profit_loss_df_by_month, save_path):
         profit_loss_df_by_day.plot(kind='bar', x='DATE', y='PROFIT LOSS AMOUNT')
         plt.suptitle("PROFIT LOSS AMOUNT vs DATE BAR GRAPH")
         plt.savefig("./output/" + save_path + "/PROFIT LOSS AMOUNT vs DATE BAR GRAPH.png")
-        plt.show()
+        # plt.show()
 
 
 def start_simulate(option):
+    start = time.time()
+
     data_file_path = option["data_file_path"]
     cash = option["cash"]
     pip = option["pip"]
@@ -260,6 +247,8 @@ def start_simulate(option):
     save_path = (data_file_path.split("/"))[-1] + "-" + option["type"] + "-" + str(pip) + "-" + str(
         stop_loss_pip) + "-" + str(stop_profit_pip)
     save_test_result(profit_loss_df_by_day, profit_loss_df_by_month, save_path)
+    end = time.time()
+    print('time elapsed: {} seconds'.format(end - start))
 
 
 if __name__ == '__main__':
@@ -272,12 +261,14 @@ if __name__ == '__main__':
         {"data_file_path": "./data/USD/AUDCNH2015-2020.csv", "cash": 10000, "pip": 0.0001,
          "stop_loss_pip": 100, "stop_profit_pip": 400, "type": "nr4"}
     ]
-    threads = []
+
+    # use process instead of thread since matplotlib is not thread safe
+    processes = []
     for option in options:
         if len(option.keys()) == 6:
-            thread = threading.Thread(target=start_simulate, args=(option,))
-            threads.append(thread)
-            thread.start()
+            process = multiprocessing.Process(target=start_simulate, args=(option,))
+            processes.append(process)
+            process.start()
 
-    for thread in threads:
-        thread.join()
+    for process in processes:
+        process.join()
