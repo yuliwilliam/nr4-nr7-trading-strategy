@@ -11,7 +11,7 @@ def load_data(data_file_path):
     return data
 
 
-def get_everyday_data(data):
+def get_data_by_date(data):
     data_list = []
     data_size = data.shape[0]
     # smaller data size for testing purpose
@@ -78,91 +78,89 @@ def get_nr7_days(everyday_data, pip):
     return buy_sell_prices
 
 
-def test_result(data, buy_sell_prices, cash, stop_loss_pip, stop_profit_pip):
+def open_position(indicator, cash, curr_price, holdings):
+    position = curr_price
+    holdings = indicator * int(cash / curr_price)
+    cash = cash - curr_price * holdings
+    return cash, holdings, position
+
+
+def close_position(cash, curr_price, holdings):
+    cash = cash + curr_price * holdings
+    position = 0
+    holdings = 0
+    return cash, holdings, position
+
+
+def trade(cash, holdings, position, curr_price, buy_price, short_price, stop_loss_pip, stop_profit_pip,
+          is_last_trading_period):
+    # buy sell when no holdings
+    if position == 0 and holdings == 0:
+        if curr_price >= buy_price:
+            cash, holdings, position = open_position(1, cash, curr_price, holdings)
+            print("        bought at {}".format(curr_price))
+        if curr_price <= short_price:
+            cash, holdings, position = open_position(-1, cash, curr_price, holdings)
+            print("        short at {}".format(curr_price))
+
+    # holdings in hand
+    if position != 0 or holdings != 0:
+        # check loss
+        if holdings > 0 and curr_price <= position - position * stop_loss_pip:
+            cash, holdings, position = close_position(cash, curr_price, holdings)
+            print("        stop loss bought at {}".format(curr_price))
+
+        elif holdings < 0 and curr_price >= position + position * stop_loss_pip:
+            cash, holdings, position = close_position(cash, curr_price, holdings)
+            print("        stop loss shorted at {}".format(curr_price))
+
+        # check profit
+        elif holdings > 0 and curr_price >= position + position * stop_profit_pip:
+            cash, holdings, position = close_position(cash, curr_price, holdings)
+            print("        stop profit bought at {}".format(curr_price))
+
+        elif holdings < 0 and curr_price <= position - position * stop_profit_pip:
+            cash, holdings, position = close_position(cash, curr_price, holdings)
+            print("        stop profit shorted at {}".format(curr_price))
+
+        # clean up, if last day last entry
+        elif is_last_trading_period:
+            if holdings > 0:
+                print("        cleaned bought at {}".format(curr_price))
+            if holdings < 0:
+                print("        cleaned shorted at {}".format(curr_price))
+            cash, holdings, position = close_position(cash, curr_price, holdings)
+    return cash, holdings, position
+
+
+def backtest(data, buy_sell_prices, cash, stop_loss_pip, stop_profit_pip):
     start_cash = cash
     print("started testing with {} cash".format(start_cash))
     profit_loss_data_by_day = {'DATE': [], 'PROFIT LOSS PERCENTAGE': [], 'PROFIT LOSS AMOUNT': []}
     profit_loss_data_by_month = {'MONTH': [], 'PROFIT LOSS PERCENTAGE': [], 'PROFIT LOSS AMOUNT': []}
 
     for buy_sell_price in buy_sell_prices:
-        initial_cash = cash
-        position = 0
-        holdings = 0
-        indicator = ''
-        buy_price = buy_sell_price['BUY']
-        short_price = buy_sell_price['SHORT']
+        curr_period_initial_cash, holdings, position, = cash, 0, 0
+        buy_price, short_price = buy_sell_price['BUY'], buy_sell_price['SHORT']
         print("dates: {}".format(buy_sell_price['DATE']))
         for day_number, curr_date in enumerate(buy_sell_price['DATE']):
             curr_day_data = data.loc[data['<DTYYYYMMDD>'] == curr_date]
-            entry_number = 0
             print("    date: {}".format(curr_date))
-
             for i in range(curr_day_data.shape[0]):
                 curr_price = curr_day_data['<CLOSE>'].iloc[i]
+                # clean up, if last day last entry
+                is_last_trading_period = i == curr_day_data.shape[0] - 1 and day_number == len(
+                    buy_sell_price['DATE']) - 1
+                cash, holdings, position = trade(cash, holdings, position, curr_price, buy_price, short_price,
+                                                 stop_loss_pip, stop_profit_pip, is_last_trading_period)
 
-                # buy sell
-                if indicator == '' and curr_price >= buy_price:
-                    position = curr_price
-                    holdings = int(cash / curr_price)
-                    cash = cash - curr_price * holdings
-                    indicator = 'b'
-                    print("        bought at {}".format(curr_price))
-                if indicator == '' and curr_price <= short_price:
-                    position = curr_price
-                    holdings = int(cash / curr_price)
-                    cash = cash + curr_price * holdings
-                    indicator = 's'
-                    print("        shorted at {}".format(curr_price))
-
-                # holdings in hand
-                if position != 0 or holdings != 0:
-                    # check loss
-                    if indicator == 'b' and curr_price <= position - position * stop_loss_pip:
-                        cash = cash + curr_price * holdings
-                        position = 0
-                        holdings = 0
-                        print("        stop loss bought at {}".format(curr_price))
-
-                    elif indicator == 's' and curr_price >= position + position * stop_loss_pip:
-                        cash = cash - curr_price * holdings
-                        position = 0
-                        holdings = 0
-                        print("        stop loss shorted at {}".format(curr_price))
-
-                    # check profit
-                    elif indicator == 'b' and curr_price >= position + position * stop_profit_pip:
-                        cash = cash + curr_price * holdings
-                        position = 0
-                        holdings = 0
-                        print("        stop profit bought at {}".format(curr_price))
-
-                    elif indicator == 's' and curr_price <= position - position * stop_profit_pip:
-                        cash = cash - curr_price * holdings
-                        position = 0
-                        holdings = 0
-                        print("        stop profit shorted at {}".format(curr_price))
-
-                    # clean up, if last day last entry
-                    elif entry_number == curr_day_data.shape[0] - 1 and day_number == (len(buy_sell_price['DATE']) - 1):
-                        if indicator == 'b':
-                            cash = cash + curr_price * holdings
-                            position = 0
-                            holdings = 0
-                            print("        cleaned bought at {}".format(curr_price))
-                        if indicator == 's':
-                            cash = cash - curr_price * holdings
-                            position = 0
-                            holdings = 0
-                            print("        cleaned shorted at {}".format(curr_price))
-                entry_number += 1
-
-        profit_loss = cash - initial_cash
-        profit_loss_percentage = profit_loss / initial_cash
-        profit_loss_data_by_day['DATE'].append(str(curr_date))
+        profit_loss = cash - curr_period_initial_cash
+        profit_loss_percentage = profit_loss / curr_period_initial_cash
+        profit_loss_data_by_day['DATE'].append(str(buy_sell_price['DATE'][0]))
         profit_loss_data_by_day['PROFIT LOSS PERCENTAGE'].append(profit_loss_percentage)
         profit_loss_data_by_day['PROFIT LOSS AMOUNT'].append(profit_loss)
 
-        curr_month = (str(curr_date))[0:6]
+        curr_month = str(buy_sell_price['DATE'][0])[0:6]
         # new month
         if curr_month not in profit_loss_data_by_month['MONTH']:
             profit_loss_data_by_month['MONTH'].append(curr_month)
@@ -177,7 +175,7 @@ def test_result(data, buy_sell_prices, cash, stop_loss_pip, stop_profit_pip):
                        * profit_loss_data_by_month['PROFIT LOSS PERCENTAGE'][-1]
             profit_loss_data_by_month['PROFIT LOSS AMOUNT'][-1] += profit_loss
 
-        print("    cash on open: {}, cash on close: {}".format(initial_cash, cash))
+        print("    cash on open: {}, cash on close: {}".format(curr_period_initial_cash, cash))
         print("    profit/loss amount: {}, profit/loss rate: {}".format(profit_loss, profit_loss_percentage))
 
     profit_loss_df_by_day = pd.DataFrame(profit_loss_data_by_day,
@@ -226,7 +224,7 @@ def save_test_result(profit_loss_df_by_day, profit_loss_df_by_month, save_path):
         # plt.show()
 
 
-def start_simulate(option):
+def start_simulation(option):
     start = time.time()
 
     data_file_path = option["data_file_path"]
@@ -236,14 +234,14 @@ def start_simulate(option):
     stop_profit_pip = option["stop_profit_pip"] * pip
 
     data = load_data(data_file_path)
-    everyday_data = get_everyday_data(data)
+    everyday_data = get_data_by_date(data)
     buy_sell_prices = []
     if option["type"] == "nr4":
         buy_sell_prices = get_nr4_days(everyday_data, pip)
     elif option["type"] == "nr7":
         buy_sell_prices = get_nr7_days(everyday_data, pip)
-    profit_loss_df_by_day, profit_loss_df_by_month = test_result(data, buy_sell_prices, cash, stop_loss_pip,
-                                                                 stop_profit_pip)
+    profit_loss_df_by_day, profit_loss_df_by_month = backtest(data, buy_sell_prices, cash, stop_loss_pip,
+                                                              stop_profit_pip)
     save_path = (data_file_path.split("/"))[-1] + "-" + option["type"] + "-" + str(pip) + "-" + str(
         stop_loss_pip) + "-" + str(stop_profit_pip)
     save_test_result(profit_loss_df_by_day, profit_loss_df_by_month, save_path)
@@ -266,7 +264,7 @@ if __name__ == '__main__':
     processes = []
     for option in options:
         if len(option.keys()) == 6:
-            process = multiprocessing.Process(target=start_simulate, args=(option,))
+            process = multiprocessing.Process(target=start_simulation, args=(option,))
             processes.append(process)
             process.start()
 
