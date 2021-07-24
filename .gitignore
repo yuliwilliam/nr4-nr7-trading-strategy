@@ -4,7 +4,4 @@ venv
 .DS_Store
 
 # data set files
-*.csv
-
-# output graphs
-*.png
+data
