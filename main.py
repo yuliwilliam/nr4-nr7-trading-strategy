@@ -79,6 +79,7 @@ def get_nr7_days(everyday_data, pip):
 
 
 def open_position(indicator, cash, curr_price, holdings):
+    # indicator = 1 - buy, indicator = -1 - sell
     position = curr_price
     holdings = indicator * int(cash / curr_price)
     cash = cash - curr_price * holdings
